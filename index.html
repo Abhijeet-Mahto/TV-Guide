@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TV Guide Prototype</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #141821;
+    --panel-2: #1b2130;
+    --line: #2a3246;
+    --text: #eef1f7;
+    --muted: #8d97ad;
+    --accent: #ffb020;
+    --accent-ink: #1a1200;
+    --ok: #3ddc97;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .2px; }
+  .badges { display: flex; gap: 8px; font-size: 12px; color: var(--muted); }
+  .badge { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; }
+  .badge.live { color: var(--ok); border-color: var(--ok); }
+  .grid { display: grid; gap: 16px; margin-top: 16px; grid-template-columns: 1fr; }
+  @media (min-width: 820px) { .grid { grid-template-columns: 340px 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+  input[type=text], select {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); font: inherit;
+  }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  button {
+    font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); padding: 10px 14px;
+  }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  .results { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+  .results button { width: 100%; text-align: left; }
+  .results small { color: var(--muted); display: block; }
+  .picked { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); }
+  .picked b { color: var(--accent); }
+  .time { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+  .quick { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .ask { display: flex; gap: 8px; }
+  .ask input { flex: 1; }
+  .answer {
+    margin-top: 16px; padding: 18px 20px; border-radius: 12px; background: var(--panel-2);
+    border: 1px solid var(--line); font-size: 22px; line-height: 1.45; min-height: 90px;
+  }
+  .answer.empty { color: var(--muted); font-size: 16px; }
+  .answer.err { border-color: #e5484d; color: #ffb4b6; font-size: 16px; }
+  details { margin-top: 14px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  pre {
+    white-space: pre-wrap; word-break: break-word; background: #0a0c11; border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px; font-size: 12.5px; color: #c6cde0; max-height: 360px; overflow: auto;
+  }
+  .meta { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .meta code { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>TV Guide <span style="color:var(--muted);font-weight:400">· prototype</span></h1>
+    <div class="badges">
+      <span class="badge" id="b-tmdb">TMDB: …</span>
+      <span class="badge" id="b-llm">LLM: …</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section class="card" aria-labelledby="h-watch">
+      <h2 id="h-watch">What are you watching?</h2>
+      <div class="row">
+        <input type="text" id="q" placeholder="Search a title" aria-label="Search a title" value="Lighthouse">
+        <button id="searchBtn" style="flex:0 0 auto">Search</button>
+      </div>
+      <ul class="results" id="results"></ul>
+
+      <div id="picker" hidden>
+        <div class="picked">Watching: <b id="pickedName"></b></div>
+        <div id="tvControls">
+          <label for="season">Season</label>
+          <select id="season"></select>
+          <label for="episode">Episode</label>
+          <select id="episode"></select>
+        </div>
+        <label for="pos">Playback position</label>
+        <input type="range" id="pos" min="0" max="3000" step="10" value="600">
+        <div class="time"><span id="posLabel">10:00</span><span id="runLabel"></span></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="h-ask">
+      <h2 id="h-ask">Ask the guide</h2>
+      <div class="quick" id="quick">
+        <button data-q="What's happening in this scene?">What's happening?</button>
+        <button data-q="Catch me up on the story so far.">Catch me up</button>
+        <button data-q="Who are the main actors in this, and who do they play?">Who's in this?</button>
+        <button data-q="Who directed this episode, and what else are they known for?">Director?</button>
+      </div>
+      <div class="ask">
+        <input type="text" id="question" placeholder="Or type your own question" aria-label="Your question">
+        <button class="primary" id="askBtn">Ask</button>
+      </div>
+
+      <div class="answer empty" id="answer" aria-live="polite">Pick a title, set where you are, then ask something.</div>
+      <div class="meta" id="meta"></div>
+
+      <details>
+        <summary>What the AI was given (spoiler clamp)</summary>
+        <pre id="ctx"></pre>
+      </details>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let current = null; // { id, type, name, runtimeMin, seasons }
+
+const fmt = (sec) => {
+  sec = Math.max(0, Math.floor(sec));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+};
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+
+async function status() {
+  try {
+    const s = await api('/api/status');
+    $('b-tmdb').textContent = `TMDB: ${s.tmdb}`; $('b-tmdb').classList.toggle('live', s.tmdb === 'live');
+    $('b-llm').textContent = `LLM: ${s.llm}`; $('b-llm').classList.toggle('live', s.llm === 'live');
+  } catch {}
+}
+
+async function search() {
+  const q = $('q').value.trim();
+  const { results } = await api('/api/search?q=' + encodeURIComponent(q));
+  const ul = $('results');
+  ul.innerHTML = '';
+  if (!results.length) { ul.innerHTML = '<li style="color:var(--muted)">No matches.</li>'; return; }
+  for (const r of results) {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.innerHTML = `${r.name} <small>${r.type === 'tv' ? 'TV' : 'Movie'}${r.year ? ' · ' + r.year : ''}</small>`;
+    b.onclick = () => pick(r);
+    li.appendChild(b); ul.appendChild(li);
+  }
+}
+
+async function pick(r) {
+  current = await api(`/api/title/${r.type}/${r.id}`);
+  $('picker').hidden = false;
+  $('pickedName').textContent = current.name;
+  $('tvControls').hidden = current.type !== 'tv';
+
+  if (current.type === 'tv') {
+    $('season').innerHTML = current.seasons.map((s) => `<option value="${s.number}">Season ${s.number}</option>`).join('');
+    fillEpisodes();
+  } else {
+    setRuntime(current.runtimeMin);
+  }
+}
+
+function fillEpisodes() {
+  const s = current.seasons.find((x) => x.number === Number($('season').value));
+  $('episode').innerHTML = s.episodes.map((e) => `<option value="${e.number}">E${e.number} · ${e.name}</option>`).join('');
+  syncRuntime();
+}
+
+function syncRuntime() {
+  if (current.type !== 'tv') return;
+  const s = current.seasons.find((x) => x.number === Number($('season').value));
+  const e = s.episodes.find((x) => x.number === Number($('episode').value));
+  setRuntime(e?.runtimeMin || current.runtimeMin);
+}
+
+function setRuntime(min) {
+  const total = (min || 60) * 60;
+  const pos = $('pos');
+  pos.max = total;
+  if (Number(pos.value) > total) pos.value = Math.floor(total / 2);
+  $('runLabel').textContent = `of ${min || '?'} min`;
+  $('posLabel').textContent = fmt(pos.value);
+}
+
+async function ask(question) {
+  if (!current) { setAnswer('Pick a title first.', 'err'); return; }
+  question = (question || $('question').value).trim();
+  if (!question) return;
+  setAnswer('Thinking…', 'empty');
+  try {
+    const out = await api('/api/ask', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        id: current.id, type: current.type,
+        season: Number($('season').value) || 1,
+        episode: Number($('episode').value) || 1,
+        positionSec: Number($('pos').value),
+        question,
+      }),
+    });
+    setAnswer(out.answer, out.mock ? 'empty' : '');
+    $('ctx').textContent = out.context;
+    const ex = out.meta.excluded.length ? out.meta.excluded.join(', ') : 'none';
+    $('meta').innerHTML = `Withheld from the AI: <code>${ex}</code>`;
+  } catch (e) {
+    setAnswer(e.message, 'err');
+  }
+}
+
+function setAnswer(text, cls) {
+  const a = $('answer');
+  a.textContent = text;
+  a.className = 'answer' + (cls ? ' ' + cls : '');
+}
+
+$('searchBtn').onclick = search;
+$('q').addEventListener('keydown', (e) => e.key === 'Enter' && search());
+$('season').onchange = fillEpisodes;
+$('episode').onchange = syncRuntime;
+$('pos').oninput = () => ($('posLabel').textContent = fmt($('pos').value));
+$('askBtn').onclick = () => ask();
+$('question').addEventListener('keydown', (e) => e.key === 'Enter' && ask());
+$('quick').addEventListener('click', (e) => { const q = e.target.dataset?.q; if (q) ask(q); });
+
+status();
+search();
+</script>
+</body>
+</html>
